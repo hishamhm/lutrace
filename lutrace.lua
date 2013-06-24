@@ -64,7 +64,7 @@ debug.sethook(function(hook_type)
       levels = levels + 1
    end
    local info = debug.getinfo(2, "nSu")
-   if not info.source:match(lutrace.opt.filter) then return end
+   if lutrace.opt.filter and not info.source:match(lutrace.opt.filter) then return end
    local out = {info.name, "("}
    local args = {}
    for i = 1, (info.nparams or 0) do
