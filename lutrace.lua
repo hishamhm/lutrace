@@ -40,7 +40,7 @@ end
 
 local function split(s, sep)
    local pieces = {}
-   for w in s:gmatch("([^"..sep.."])*") do table.insert(pieces, w) end
+   for w in s:gmatch("([^"..sep.."]*)"..sep.."*") do table.insert(pieces, w) end
    return pieces
 end
 
@@ -50,12 +50,12 @@ local function where(info, dirs)
    end
    local parts = split(info.short_src, "/")
    local path
-   if #parts > dirs then
-      path = ".../"..table.concat(parts, "/", #parts-dirs, #parts)
+   if #parts > dirs+1 then
+      path = ".../"..table.concat(parts, "/", #parts-dirs, #parts-1)
    else
       path = info.short_src
    end
-   return path..":"..info.linedefined..":"
+   return path..":"..info.currentline..":"
 end
 
 debug.sethook(function(hook_type)
@@ -63,6 +63,7 @@ debug.sethook(function(hook_type)
    while debug.getinfo(levels, "") do
       levels = levels + 1
    end
+   local caller = debug.getinfo(3, "Sl")
    local info = debug.getinfo(2, "nSu")
    if lutrace.opt.filter and not info.source:match(lutrace.opt.filter) then return end
    local out = {info.name, "("}
@@ -83,7 +84,7 @@ debug.sethook(function(hook_type)
          i=i-1
       end
    end
-   local dirs = where(info, lutrace.opt.dirs)
+   local dirs = where(caller, lutrace.opt.dirs)
    print(stars(levels).." "..(dirs and dirs.."\t" or "")..(info.name or "?").."("..table.concat(args, ", ")..")")
 end, "c")
 
