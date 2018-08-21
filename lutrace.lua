@@ -19,10 +19,24 @@
 -- * LuaTrace: https://github.com/geoffleyland/luatrace
 -- * LuaCov: http://keplerproject.github.io/luacov/
 
+local function turn_on()
+   local var = os.getenv("LUTRACE_ON")
+   if not var then
+      return true
+   elseif var == "0" then
+      return false
+   else
+      return true
+   end
+end
+
 local lutrace = {
    opt = {
       filter = os.getenv("LUTRACE_FILTER"),
+      exclude = os.getenv("LUTRACE_EXCLUDE"),
+      time = os.getenv("LUTRACE_TIME"),
       dirs = tonumber(os.getenv("LUTRACE_DIRS") or 3),
+      on = turn_on(),
    }
 }
 
@@ -45,8 +59,11 @@ local function split(s, sep)
 end
 
 local function where(info, dirs)
+   if not info then
+      return "?"
+   end
    if not info.short_src then
-      return
+      return "?"
    end
    local parts = split(info.short_src, "/")
    local path
@@ -58,15 +75,18 @@ local function where(info, dirs)
    return path..":"..info.currentline..":"
 end
 
-debug.sethook(function(hook_type)
-   levels = 2
+debug.sethook(function()
+   if not lutrace.opt.on then
+      return
+   end
+   local levels = 2
    while debug.getinfo(levels, "") do
       levels = levels + 1
    end
    local caller = debug.getinfo(3, "Sl")
    local info = debug.getinfo(2, "nSu")
    if lutrace.opt.filter and not info.source:match(lutrace.opt.filter) then return end
-   local out = {info.name, "("}
+   if lutrace.opt.exclude and info.source:match(lutrace.opt.exclude) then return end
    local args = {}
    for i = 1, (info.nparams or 0) do
       local k, v = debug.getlocal(2, i)
@@ -74,18 +94,21 @@ debug.sethook(function(hook_type)
       table.insert(args, k.."="..tostring(v))
    end
    if info.isvararg then
-      i = -1
+      local i = -1
       while true do
          local k,v = debug.getlocal(2, i)
          if type(v) == "string" then v="\""..v.."\"" end
          
          if not k then break end
          table.insert(args, tostring(v))
-         i=i-1
+         i = i - 1
       end
    end
    local dirs = where(caller, lutrace.opt.dirs)
-   print(stars(levels).." "..(dirs and dirs.."\t" or "")..(info.name or "?").."("..table.concat(args, ", ")..")")
+   if lutrace.opt.time then
+      io.stderr:write(tostring(os.time()).." ")
+   end
+   io.stderr:write(stars(levels).." "..(dirs and dirs.."\t" or "")..(info.name or "?").."("..table.concat(args, ", ")..")\n")
 end, "c")
 
 return {}
